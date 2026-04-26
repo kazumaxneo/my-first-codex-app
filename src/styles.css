@@ -232,6 +232,7 @@ input[type="range"] {
 }
 
 .insight-block,
+.upload-card,
 .legend,
 .footer-note {
   border: 1px solid #dce3e7;
@@ -239,8 +240,49 @@ input[type="range"] {
   background: #fbfcfd;
 }
 
+.upload-card,
 .insight-block {
   padding: 14px;
+}
+
+.upload-card p,
+.upload-card small {
+  display: block;
+  margin-top: 10px;
+  color: #5f6d75;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.file-picker {
+  display: block;
+  position: relative;
+  margin-top: 12px;
+}
+
+.file-picker input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-picker span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  color: #15321f;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid #8ddcad;
+  border-radius: 8px;
+  background: #ecfff4;
+}
+
+.file-picker:hover span {
+  background: #ddfaea;
 }
 
 .insight-block p {

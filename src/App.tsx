@@ -9,7 +9,9 @@ import {
   RotateCcw,
   SlidersHorizontal,
   Sparkles,
+  UploadCloud,
 } from 'lucide-react';
+import { parseBamFile, type BamAnalysis } from './bam';
 
 type Settings = {
   readCount: number;
@@ -37,6 +39,9 @@ type Read = {
 };
 
 type Simulation = {
+  source: 'synthetic' | 'bam';
+  fileName?: string;
+  referenceName?: string;
   genomeLength: number;
   variantPosition: number;
   reads: Read[];
@@ -47,6 +52,7 @@ type Simulation = {
   observedAltFraction: number;
   variantDepth: number;
   confidence: 'Low' | 'Watch' | 'Strong';
+  mappedCount?: number;
 };
 
 const initialSettings: Settings = {
@@ -161,6 +167,7 @@ function simulate(settings: Settings): Simulation {
         : 'Low';
 
   return {
+    source: 'synthetic',
     genomeLength,
     variantPosition: settings.variantPosition,
     reads,
@@ -171,6 +178,59 @@ function simulate(settings: Settings): Simulation {
     observedAltFraction,
     variantDepth,
     confidence,
+  };
+}
+
+function simulationFromBam(analysis: BamAnalysis, variantPosition: number): Simulation {
+  const position = clamp(variantPosition, 0, analysis.genomeLength - 1);
+  const reads: Read[] = analysis.reads.map((read) => {
+    const supportsEvent =
+      read.mismatchPositions.some((pos) => Math.abs(pos - position) <= 1) ||
+      read.indelPositions.some((pos) => Math.abs(pos - position) <= 1);
+    return {
+      id: read.id,
+      start: read.start,
+      end: read.end,
+      row: read.row,
+      strand: read.strand,
+      duplicate: read.duplicate,
+      hasAlt: supportsEvent,
+      quality: read.mapq,
+      mismatchPositions: read.mismatchPositions,
+      indelPositions: read.indelPositions,
+    };
+  });
+  const eventReads = reads.filter(
+    (read) =>
+      read.start <= position &&
+      read.end >= position &&
+      (read.mismatchPositions.some((pos) => Math.abs(pos - position) <= 1) ||
+        read.indelPositions.some((pos) => Math.abs(pos - position) <= 1)),
+  ).length;
+  const variantDepth = analysis.coverage[position] ?? 0;
+  const observedAltFraction = variantDepth ? eventReads / variantDepth : 0;
+  const confidence =
+    variantDepth >= 18 && observedAltFraction > 0.22
+      ? 'Strong'
+      : variantDepth >= 8 && observedAltFraction > 0.12
+        ? 'Watch'
+        : 'Low';
+
+  return {
+    source: 'bam',
+    fileName: analysis.fileName,
+    referenceName: analysis.referenceName,
+    genomeLength: analysis.genomeLength,
+    variantPosition: position,
+    reads,
+    coverage: analysis.coverage,
+    altCoverage: new Array(analysis.genomeLength).fill(0),
+    gc: new Array(analysis.genomeLength).fill(0.5),
+    maxCoverage: analysis.maxCoverage,
+    observedAltFraction,
+    variantDepth,
+    confidence,
+    mappedCount: analysis.mappedCount,
   };
 }
 
@@ -248,15 +308,23 @@ function CoverageCanvas({
       context.lineWidth = 1;
       context.strokeRect(left, gcY, trackWidth, gcHeight);
       context.beginPath();
-      simulation.gc.forEach((gc, pos) => {
-        const x = xFor(pos);
-        const y = gcY + gcHeight - gc * gcHeight;
-        if (pos === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      });
-      context.strokeStyle = '#45a36f';
-      context.lineWidth = 2;
-      context.stroke();
+      if (simulation.source === 'synthetic') {
+        simulation.gc.forEach((gc, pos) => {
+          const x = xFor(pos);
+          const y = gcY + gcHeight - gc * gcHeight;
+          if (pos === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        });
+        context.strokeStyle = '#45a36f';
+        context.lineWidth = 2;
+        context.stroke();
+      } else {
+        context.fillStyle = '#f7f9fa';
+        context.fillRect(left, gcY, trackWidth, gcHeight);
+        context.fillStyle = '#69757c';
+        context.font = '600 12px Inter, system-ui, sans-serif';
+        context.fillText(`${simulation.referenceName ?? 'reference'} (${simulation.genomeLength.toLocaleString()} bp)`, left + 12, gcY + 36);
+      }
 
       const coverageY = 110;
       const coverageHeight = 56;
@@ -426,6 +494,8 @@ function Slider({
 
 export default function App() {
   const [settings, setSettings] = useState<Settings>(initialSettings);
+  const [bamAnalysis, setBamAnalysis] = useState<BamAnalysis | null>(null);
+  const [uploadMessage, setUploadMessage] = useState('BAM: not loaded');
 
   useEffect(() => {
     if (!settings.playing) return;
@@ -435,11 +505,28 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, [settings.playing]);
 
-  const simulation = useMemo(() => simulate(settings), [settings]);
+  const simulation = useMemo(
+    () => (bamAnalysis ? simulationFromBam(bamAnalysis, settings.variantPosition) : simulate(settings)),
+    [bamAnalysis, settings],
+  );
   const duplicateReads = simulation.reads.filter((read) => read.duplicate).length;
   const confidenceTone = simulation.confidence === 'Strong' ? 'green' : simulation.confidence === 'Watch' ? 'amber' : 'rose';
 
   const update = (patch: Partial<Settings>) => setSettings((current) => ({ ...current, ...patch }));
+
+  const handleBamUpload = async (file: File | undefined) => {
+    if (!file) return;
+    setUploadMessage('BAMを解析中...');
+    try {
+      const analysis = await parseBamFile(file);
+      setBamAnalysis(analysis);
+      update({ variantPosition: Math.min(settings.variantPosition, analysis.genomeLength - 1), playing: false });
+      setUploadMessage(`${analysis.fileName} / ${analysis.referenceName} / ${analysis.mappedCount} reads`);
+    } catch (error) {
+      setBamAnalysis(null);
+      setUploadMessage(error instanceof Error ? error.message : 'BAMの解析に失敗しました。');
+    }
+  };
 
   return (
     <main className="app-shell">
@@ -467,11 +554,24 @@ export default function App() {
               className="icon-button"
               type="button"
               title="New random library"
-              onClick={() => update({ seed: settings.seed + 11 })}
+              onClick={() => {
+                setBamAnalysis(null);
+                setUploadMessage('BAM: not loaded');
+                update({ seed: settings.seed + 11 });
+              }}
             >
               <Sparkles size={18} />
             </button>
-            <button className="icon-button" type="button" title="Reset controls" onClick={() => setSettings(initialSettings)}>
+            <button
+              className="icon-button"
+              type="button"
+              title="Reset controls"
+              onClick={() => {
+                setBamAnalysis(null);
+                setUploadMessage('BAM: not loaded');
+                setSettings(initialSettings);
+              }}
+            >
               <RotateCcw size={18} />
             </button>
           </div>
@@ -482,7 +582,11 @@ export default function App() {
         </div>
 
         <section className="metrics-row" aria-label="Simulation metrics">
-          <Metric label="Mean depth" value={`${(settings.readCount * settings.readLength / genomeLength).toFixed(1)}x`} tone="green" />
+          <Metric
+            label="Mean depth"
+            value={`${(simulation.coverage.reduce((sum, depth) => sum + depth, 0) / simulation.genomeLength).toFixed(1)}x`}
+            tone="green"
+          />
           <Metric label="Max depth" value={`${simulation.maxCoverage}x`} />
           <Metric label="SNV depth" value={`${simulation.variantDepth}x`} tone={confidenceTone} />
           <Metric label="Alt fraction" value={`${Math.round(simulation.observedAltFraction * 100)}%`} tone={confidenceTone} />
@@ -491,9 +595,22 @@ export default function App() {
       </section>
 
       <aside className="side-panel">
+        <div className="upload-card">
+          <div className="panel-heading compact">
+            <UploadCloud size={18} />
+            <h2>BAM Input</h2>
+          </div>
+          <label className="file-picker">
+            <input type="file" accept=".bam,application/octet-stream" onChange={(event) => handleBamUpload(event.target.files?.[0])} />
+            <span>Choose BAM</span>
+          </label>
+          <p>{uploadMessage}</p>
+          <small>5MB以下、最初のreferenceが10kb以下のBAMに限定しています。BAIは不要です。</small>
+        </div>
+
         <div className="panel-heading">
           <SlidersHorizontal size={18} />
-          <h2>Library Model</h2>
+          <h2>{bamAnalysis ? 'Synthetic Model' : 'Library Model'}</h2>
         </div>
         <div className="controls">
           <Slider label="Reads" value={settings.readCount} min={40} max={460} step={10} onChange={(readCount) => update({ readCount })} />
