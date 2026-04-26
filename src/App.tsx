@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { PointerEvent } from 'react';
 import {
   Activity,
   Dna,
@@ -17,6 +18,7 @@ type Settings = {
   gcBias: number;
   duplicateRate: number;
   variantAlleleFraction: number;
+  variantPosition: number;
   seed: number;
   playing: boolean;
 };
@@ -31,6 +33,7 @@ type Read = {
   hasAlt: boolean;
   quality: number;
   mismatchPositions: number[];
+  indelPositions: number[];
 };
 
 type Simulation = {
@@ -53,12 +56,12 @@ const initialSettings: Settings = {
   gcBias: 34,
   duplicateRate: 8,
   variantAlleleFraction: 50,
+  variantPosition: 690,
   seed: 18,
   playing: false,
 };
 
 const genomeLength = 1200;
-const variantPosition = 690;
 
 function mulberry32(seed: number) {
   return () => {
@@ -111,11 +114,14 @@ function simulate(settings: Settings): Simulation {
     const row = rowEnds.findIndex((rowEnd) => start > rowEnd + 5);
     const finalRow = row === -1 ? rowEnds.length : row;
     rowEnds[finalRow] = end;
-    const hasAlt = start <= variantPosition && end >= variantPosition && random() * 100 < settings.variantAlleleFraction;
+    const hasAlt = start <= settings.variantPosition && end >= settings.variantPosition && random() * 100 < settings.variantAlleleFraction;
     const mismatchPositions: number[] = [];
+    const indelPositions: number[] = [];
     const errorEvents = Math.floor((settings.errorRate / 100) * settings.readLength + random() * 2);
     for (let i = 0; i < errorEvents; i += 1) {
-      mismatchPositions.push(start + Math.floor(random() * settings.readLength));
+      const eventPosition = start + Math.floor(random() * settings.readLength);
+      if (random() < 0.24) indelPositions.push(eventPosition);
+      else mismatchPositions.push(eventPosition);
     }
 
     const read: Read = {
@@ -128,12 +134,13 @@ function simulate(settings: Settings): Simulation {
       hasAlt,
       quality: Math.round(20 + random() * 18 - settings.errorRate * 0.7),
       mismatchPositions,
+      indelPositions,
     };
     reads.push(read);
 
     for (let pos = start; pos < end && pos < genomeLength; pos += 1) {
       coverage[pos] += 1;
-      if (hasAlt && Math.abs(pos - variantPosition) < 2) altCoverage[pos] += 1;
+      if (hasAlt && Math.abs(pos - settings.variantPosition) < 2) altCoverage[pos] += 1;
     }
   };
 
@@ -144,8 +151,8 @@ function simulate(settings: Settings): Simulation {
   }
 
   const maxCoverage = Math.max(...coverage, 1);
-  const variantDepth = coverage[variantPosition];
-  const observedAltFraction = variantDepth ? altCoverage[variantPosition] / variantDepth : 0;
+  const variantDepth = coverage[settings.variantPosition];
+  const observedAltFraction = variantDepth ? altCoverage[settings.variantPosition] / variantDepth : 0;
   const confidence =
     variantDepth >= 18 && observedAltFraction > 0.22
       ? 'Strong'
@@ -155,7 +162,7 @@ function simulate(settings: Settings): Simulation {
 
   return {
     genomeLength,
-    variantPosition,
+    variantPosition: settings.variantPosition,
     reads,
     coverage,
     altCoverage,
@@ -185,8 +192,15 @@ function drawRoundedRect(
   context.closePath();
 }
 
-function CoverageCanvas({ simulation }: { simulation: Simulation }) {
+function CoverageCanvas({
+  simulation,
+  onVariantPositionChange,
+}: {
+  simulation: Simulation;
+  onVariantPositionChange: (position: number) => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -203,35 +217,34 @@ function CoverageCanvas({ simulation }: { simulation: Simulation }) {
 
       const width = rect.width;
       const height = rect.height;
-      const left = 34;
-      const right = 22;
+      const left = 58;
+      const right = 28;
       const trackWidth = width - left - right;
       const xFor = (pos: number) => left + (pos / simulation.genomeLength) * trackWidth;
 
       context.clearRect(0, 0, width, height);
-      const bg = context.createLinearGradient(0, 0, width, height);
-      bg.addColorStop(0, '#07110f');
-      bg.addColorStop(0.5, '#11130f');
-      bg.addColorStop(1, '#150d17');
-      context.fillStyle = bg;
+      context.fillStyle = '#ffffff';
       context.fillRect(0, 0, width, height);
 
-      for (let i = 0; i < 90; i += 1) {
-        const x = (i * 79) % width;
-        const y = (i * 47) % height;
-        context.fillStyle = `rgba(230, 255, 238, ${0.04 + (i % 5) * 0.015})`;
-        context.fillRect(x, y, 1, 1);
+      for (let tick = 0; tick <= 12; tick += 1) {
+        const x = left + (tick / 12) * trackWidth;
+        context.strokeStyle = '#eef1f3';
+        context.lineWidth = 1;
+        context.beginPath();
+        context.moveTo(x, 22);
+        context.lineTo(x, height - 30);
+        context.stroke();
       }
 
       context.font = '600 11px Inter, system-ui, sans-serif';
-      context.fillStyle = '#8ca096';
-      context.fillText('GC%', 8, 41);
-      context.fillText('READS', 8, 136);
-      context.fillText('DEPTH', 8, 344);
+      context.fillStyle = '#66727a';
+      context.fillText('GC%', 16, 45);
+      context.fillText('DEPTH', 16, 122);
+      context.fillText('READS', 16, 193);
 
       const gcY = 28;
       const gcHeight = 62;
-      context.strokeStyle = 'rgba(180, 202, 188, 0.18)';
+      context.strokeStyle = '#dde4e8';
       context.lineWidth = 1;
       context.strokeRect(left, gcY, trackWidth, gcHeight);
       context.beginPath();
@@ -241,62 +254,76 @@ function CoverageCanvas({ simulation }: { simulation: Simulation }) {
         if (pos === 0) context.moveTo(x, y);
         else context.lineTo(x, y);
       });
-      context.strokeStyle = '#7df0b2';
+      context.strokeStyle = '#45a36f';
       context.lineWidth = 2;
       context.stroke();
 
-      const readY = 108;
-      const rowHeight = 9;
-      const maxRows = Math.floor((height - 245) / rowHeight);
+      const coverageY = 110;
+      const coverageHeight = 56;
+      context.fillStyle = '#f7f9fa';
+      context.fillRect(left, coverageY, trackWidth, coverageHeight);
+      context.strokeStyle = '#dfe5e8';
+      context.strokeRect(left, coverageY, trackWidth, coverageHeight);
+      for (let i = 0; i < simulation.coverage.length; i += 2) {
+        const depth = simulation.coverage[i];
+        const normalized = depth / simulation.maxCoverage;
+        const barHeight = normalized * (coverageHeight - 8);
+        context.fillStyle = '#cbd2d6';
+        context.fillRect(xFor(i), coverageY + coverageHeight - 4 - barHeight, Math.max(1, trackWidth / simulation.genomeLength * 2), barHeight);
+      }
+
+      const readY = 185;
+      const rowHeight = 12;
+      const maxRows = Math.floor((height - 230) / rowHeight);
       simulation.reads.forEach((read) => {
         if (read.row >= maxRows) return;
         const x = xFor(read.start);
         const w = Math.max(2, xFor(read.end) - x);
         const y = readY + read.row * rowHeight;
-        const alpha = read.duplicate ? 0.34 : 0.78;
-        context.fillStyle = read.hasAlt ? `rgba(255, 202, 87, ${alpha})` : `rgba(88, 199, 178, ${alpha})`;
-        drawRoundedRect(context, x, y, w, 5, 2);
+        const alpha = read.duplicate ? 0.38 : 0.86;
+        context.fillStyle = read.hasAlt ? `rgba(244, 177, 66, ${alpha})` : `rgba(152, 160, 165, ${alpha})`;
+        drawRoundedRect(context, x, y, w, 6, 2);
         context.fill();
         if (read.strand === -1) {
-          context.fillStyle = 'rgba(10, 12, 11, 0.5)';
-          context.fillRect(x + 2, y + 2, Math.max(1, w - 4), 1);
+          context.fillStyle = 'rgba(82, 90, 96, 0.32)';
+          context.fillRect(x + 2, y + 3, Math.max(1, w - 4), 1);
         }
-        context.fillStyle = '#ff637d';
+        context.fillStyle = '#d94a4a';
         read.mismatchPositions.slice(0, 5).forEach((pos) => {
           const mx = xFor(pos);
-          if (mx >= x && mx <= x + w) context.fillRect(mx, y - 1, 2, 7);
+          if (mx >= x && mx <= x + w) context.fillRect(mx, y - 2, 2, 10);
+        });
+        read.indelPositions.slice(0, 3).forEach((pos) => {
+          const mx = xFor(pos);
+          if (mx < x || mx > x + w) return;
+          context.strokeStyle = '#7b61d8';
+          context.lineWidth = 2;
+          context.beginPath();
+          context.moveTo(mx - 4, y - 2);
+          context.lineTo(mx, y + 7);
+          context.lineTo(mx + 4, y - 2);
+          context.stroke();
         });
       });
 
-      const coverageBase = height - 76;
-      const coverageHeight = 118;
-      context.fillStyle = 'rgba(255, 255, 255, 0.04)';
-      context.fillRect(left, coverageBase - coverageHeight, trackWidth, coverageHeight);
-      for (let i = 0; i < simulation.coverage.length; i += 3) {
-        const depth = simulation.coverage[i];
-        const normalized = depth / simulation.maxCoverage;
-        const barHeight = normalized * coverageHeight;
-        const hue = 165 - normalized * 110;
-        context.fillStyle = `hsl(${hue}, 78%, ${38 + normalized * 20}%)`;
-        context.fillRect(xFor(i), coverageBase - barHeight, Math.max(1, trackWidth / simulation.genomeLength * 3), barHeight);
-      }
-
       const vx = xFor(simulation.variantPosition);
-      context.strokeStyle = '#ffcf5a';
-      context.lineWidth = 2;
+      context.strokeStyle = isDragging ? '#d08a00' : '#f2b928';
+      context.lineWidth = isDragging ? 3 : 2;
       context.beginPath();
-      context.moveTo(vx, 18);
+      context.moveTo(vx, 16);
       context.lineTo(vx, height - 32);
       context.stroke();
-      context.fillStyle = '#ffcf5a';
+      context.fillStyle = isDragging ? '#d08a00' : '#f2b928';
       context.beginPath();
-      context.arc(vx, coverageBase - 126, 7, 0, Math.PI * 2);
+      context.arc(vx, 17, 8, 0, Math.PI * 2);
       context.fill();
-      context.fillStyle = '#160d06';
+      context.fillStyle = '#ffffff';
       context.font = '800 10px Inter, system-ui, sans-serif';
-      context.fillText('SNP', vx - 9, coverageBase - 122);
+      context.fillText('S', vx - 3, 21);
+      context.fillStyle = '#8d6512';
+      context.fillText(`${simulation.variantPosition} bp`, Math.min(vx + 10, width - 82), 23);
 
-      context.fillStyle = 'rgba(230, 255, 238, 0.72)';
+      context.fillStyle = '#69757c';
       context.font = '600 11px Inter, system-ui, sans-serif';
       context.fillText('0 bp', left, height - 20);
       context.fillText(`${simulation.genomeLength} bp`, width - 82, height - 20);
@@ -306,9 +333,48 @@ function CoverageCanvas({ simulation }: { simulation: Simulation }) {
     const resizeObserver = new ResizeObserver(draw);
     resizeObserver.observe(canvas);
     return () => resizeObserver.disconnect();
-  }, [simulation]);
+  }, [simulation, isDragging]);
 
-  return <canvas className="coverage-canvas" ref={canvasRef} aria-label="Genome coverage visualization" />;
+  const positionFromPointer = (event: PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return simulation.variantPosition;
+    const rect = canvas.getBoundingClientRect();
+    const left = 58;
+    const right = 28;
+    const trackWidth = rect.width - left - right;
+    const x = clamp(event.clientX - rect.left, left, rect.width - right);
+    return Math.round(((x - left) / trackWidth) * simulation.genomeLength);
+  };
+
+  return (
+    <canvas
+      className={`coverage-canvas ${isDragging ? 'dragging' : ''}`}
+      ref={canvasRef}
+      aria-label="Genome coverage visualization"
+      onPointerDown={(event) => {
+        setIsDragging(true);
+        event.currentTarget.setPointerCapture(event.pointerId);
+        onVariantPositionChange(positionFromPointer(event));
+      }}
+      onPointerMove={(event) => {
+        if (isDragging) onVariantPositionChange(positionFromPointer(event));
+      }}
+      onPointerUp={(event) => {
+        setIsDragging(false);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+      }}
+      onPointerLeave={(event) => {
+        if (isDragging) {
+          setIsDragging(false);
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        }
+      }}
+    />
+  );
 }
 
 function Metric({ label, value, tone }: { label: string; value: string; tone?: 'green' | 'amber' | 'rose' }) {
@@ -412,13 +478,13 @@ export default function App() {
         </header>
 
         <div className="visual-stage">
-          <CoverageCanvas simulation={simulation} />
+          <CoverageCanvas simulation={simulation} onVariantPositionChange={(variantPosition) => update({ variantPosition })} />
         </div>
 
         <section className="metrics-row" aria-label="Simulation metrics">
           <Metric label="Mean depth" value={`${(settings.readCount * settings.readLength / genomeLength).toFixed(1)}x`} tone="green" />
           <Metric label="Max depth" value={`${simulation.maxCoverage}x`} />
-          <Metric label="SNP depth" value={`${simulation.variantDepth}x`} tone={confidenceTone} />
+          <Metric label="SNV depth" value={`${simulation.variantDepth}x`} tone={confidenceTone} />
           <Metric label="Alt fraction" value={`${Math.round(simulation.observedAltFraction * 100)}%`} tone={confidenceTone} />
           <Metric label="Duplicates" value={`${duplicateReads}`} tone="amber" />
         </section>
@@ -458,7 +524,7 @@ export default function App() {
             </span>
           </div>
           <p>
-            黄色の縦線は候補SNPです。周囲のリード数、alt alleleを持つリードの比率、赤いミスマッチの増え方で、低深度や高エラーが判定に与える影響を比較できます。
+            黄色の縦線はドラッグできる候補位置です。赤い縦マークはSNV、紫のV字マークはindelを表します。周囲のpileupとalt allele比率から、低深度や高エラーが判定に与える影響を比較できます。
           </p>
         </div>
 
@@ -473,7 +539,11 @@ export default function App() {
           </div>
           <div>
             <span className="swatch error" />
-            Sequencing error
+            SNV / mismatch
+          </div>
+          <div>
+            <span className="swatch indel" />
+            Indel
           </div>
           <div>
             <span className="swatch depth" />
