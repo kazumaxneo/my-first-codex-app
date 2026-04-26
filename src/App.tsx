@@ -11,7 +11,7 @@ import {
   Sparkles,
   UploadCloud,
 } from 'lucide-react';
-import { parseBamFile, type BamAnalysis } from './bam';
+import { parseBamFile, parseReferenceFile, type BamAnalysis, type ReferenceSequence } from './bam';
 
 type Settings = {
   readCount: number;
@@ -42,6 +42,7 @@ type Simulation = {
   source: 'synthetic' | 'bam';
   fileName?: string;
   referenceName?: string;
+  referenceSequence?: string;
   genomeLength: number;
   variantPosition: number;
   reads: Read[];
@@ -220,6 +221,7 @@ function simulationFromBam(analysis: BamAnalysis, variantPosition: number): Simu
     source: 'bam',
     fileName: analysis.fileName,
     referenceName: analysis.referenceName,
+    referenceSequence: analysis.referenceSequence,
     genomeLength: analysis.genomeLength,
     variantPosition: position,
     reads,
@@ -323,7 +325,10 @@ function CoverageCanvas({
         context.fillRect(left, gcY, trackWidth, gcHeight);
         context.fillStyle = '#69757c';
         context.font = '600 12px Inter, system-ui, sans-serif';
-        context.fillText(`${simulation.referenceName ?? 'reference'} (${simulation.genomeLength.toLocaleString()} bp)`, left + 12, gcY + 36);
+        const label = simulation.referenceSequence
+          ? `${simulation.referenceName ?? 'reference'} (${simulation.genomeLength.toLocaleString()} bp, FASTA loaded)`
+          : `${simulation.referenceName ?? 'reference'} (${simulation.genomeLength.toLocaleString()} bp)`;
+        context.fillText(label, left + 12, gcY + 36);
       }
 
       const coverageY = 110;
@@ -495,7 +500,9 @@ function Slider({
 export default function App() {
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [bamAnalysis, setBamAnalysis] = useState<BamAnalysis | null>(null);
+  const [reference, setReference] = useState<ReferenceSequence | null>(null);
   const [uploadMessage, setUploadMessage] = useState('BAM: not loaded');
+  const [referenceMessage, setReferenceMessage] = useState('Reference: not loaded');
 
   useEffect(() => {
     if (!settings.playing) return;
@@ -518,13 +525,30 @@ export default function App() {
     if (!file) return;
     setUploadMessage('BAMを解析中...');
     try {
-      const analysis = await parseBamFile(file);
+      const analysis = await parseBamFile(file, reference);
       setBamAnalysis(analysis);
       update({ variantPosition: Math.min(settings.variantPosition, analysis.genomeLength - 1), playing: false });
       setUploadMessage(`${analysis.fileName} / ${analysis.referenceName} / ${analysis.mappedCount} reads`);
     } catch (error) {
       setBamAnalysis(null);
       setUploadMessage(error instanceof Error ? error.message : 'BAMの解析に失敗しました。');
+    }
+  };
+
+  const handleReferenceUpload = async (file: File | undefined) => {
+    if (!file) return;
+    setReferenceMessage('FASTAを読み込み中...');
+    try {
+      const parsed = await parseReferenceFile(file);
+      setReference(parsed);
+      setBamAnalysis(null);
+      setReferenceMessage(`${parsed.fileName} / ${parsed.name} / ${parsed.sequence.length.toLocaleString()} bp`);
+      setUploadMessage('BAM: not loaded');
+      update({ variantPosition: Math.min(settings.variantPosition, parsed.sequence.length - 1), playing: false });
+    } catch (error) {
+      setReference(null);
+      setBamAnalysis(null);
+      setReferenceMessage(error instanceof Error ? error.message : 'FASTAの読み込みに失敗しました。');
     }
   };
 
@@ -556,6 +580,8 @@ export default function App() {
               title="New random library"
               onClick={() => {
                 setBamAnalysis(null);
+                setReference(null);
+                setReferenceMessage('Reference: not loaded');
                 setUploadMessage('BAM: not loaded');
                 update({ seed: settings.seed + 11 });
               }}
@@ -568,6 +594,8 @@ export default function App() {
               title="Reset controls"
               onClick={() => {
                 setBamAnalysis(null);
+                setReference(null);
+                setReferenceMessage('Reference: not loaded');
                 setUploadMessage('BAM: not loaded');
                 setSettings(initialSettings);
               }}
@@ -598,14 +626,19 @@ export default function App() {
         <div className="upload-card">
           <div className="panel-heading compact">
             <UploadCloud size={18} />
-            <h2>BAM Input</h2>
+            <h2>Input Files</h2>
           </div>
           <label className="file-picker">
+            <input type="file" accept=".fa,.fasta,.fna,text/plain" onChange={(event) => handleReferenceUpload(event.target.files?.[0])} />
+            <span>Choose FASTA reference</span>
+          </label>
+          <p>{referenceMessage}</p>
+          <label className="file-picker secondary">
             <input type="file" accept=".bam,application/octet-stream" onChange={(event) => handleBamUpload(event.target.files?.[0])} />
             <span>Choose BAM</span>
           </label>
           <p>{uploadMessage}</p>
-          <small>5MB以下、最初のreferenceが10kb以下のBAMに限定しています。BAIは不要です。</small>
+          <small>FASTAは10kb以下、BAMは5MB以下に限定しています。BAIは不要です。FASTAを先に選ぶとSNV検出がより正確になります。</small>
         </div>
 
         <div className="panel-heading">

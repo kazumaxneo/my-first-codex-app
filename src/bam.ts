@@ -17,12 +17,19 @@ export type BamAnalysis = {
   fileName: string;
   referenceName: string;
   genomeLength: number;
+  referenceSequence?: string;
   reads: BamRead[];
   coverage: number[];
   maxCoverage: number;
   meanDepth: number;
   duplicateCount: number;
   mappedCount: number;
+};
+
+export type ReferenceSequence = {
+  fileName: string;
+  name: string;
+  sequence: string;
 };
 
 const MAX_BAM_BYTES = 5 * 1024 * 1024;
@@ -55,6 +62,84 @@ function decodeReadSequence(bytes: Uint8Array, offset: number, length: number) {
     sequence += seqLookup[code] ?? 'N';
   }
   return sequence;
+}
+
+function decompressBamBytes(input: Uint8Array) {
+  if (readString(input, 0, 4) === 'BAM\u0001') return input;
+  if (input[0] !== 0x1f || input[1] !== 0x8b) {
+    throw new Error('BAMまたはBGZF圧縮BAMとして読み込めませんでした。選択したファイルが.bamか確認してください。');
+  }
+
+  const chunks: Uint8Array[] = [];
+  let offset = 0;
+  while (offset + 18 <= input.length) {
+    if (input[offset] !== 0x1f || input[offset + 1] !== 0x8b) break;
+    const flags = input[offset + 3];
+    if ((flags & 0x04) === 0) {
+      chunks.push(gunzipSync(input.subarray(offset)));
+      break;
+    }
+
+    const extraLength = input[offset + 10] | (input[offset + 11] << 8);
+    let blockSize = 0;
+    let extraOffset = offset + 12;
+    const extraEnd = extraOffset + extraLength;
+    while (extraOffset + 4 <= extraEnd) {
+      const subfieldId = String.fromCharCode(input[extraOffset], input[extraOffset + 1]);
+      const subfieldLength = input[extraOffset + 2] | (input[extraOffset + 3] << 8);
+      if (subfieldId === 'BC' && subfieldLength === 2) {
+        blockSize = (input[extraOffset + 4] | (input[extraOffset + 5] << 8)) + 1;
+        break;
+      }
+      extraOffset += 4 + subfieldLength;
+    }
+
+    if (!blockSize) {
+      chunks.push(gunzipSync(input.subarray(offset)));
+      break;
+    }
+
+    const block = input.subarray(offset, offset + blockSize);
+    const inflated = gunzipSync(block);
+    if (inflated.length > 0) chunks.push(inflated);
+    offset += blockSize;
+  }
+
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const output = new Uint8Array(totalLength);
+  let writeOffset = 0;
+  chunks.forEach((chunk) => {
+    output.set(chunk, writeOffset);
+    writeOffset += chunk.length;
+  });
+  return output;
+}
+
+export async function parseReferenceFile(file: File): Promise<ReferenceSequence> {
+  if (!/\.(fa|fasta|fna)$/i.test(file.name)) {
+    throw new Error('リファレンスはFASTA（.fa, .fasta, .fna）を選択してください。');
+  }
+  const text = await file.text();
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  const header = lines.find((line) => line.startsWith('>'));
+  if (!header) throw new Error('FASTAヘッダー（>reference_name）が見つかりません。');
+  const sequence = lines
+    .filter((line) => !line.startsWith('>'))
+    .join('')
+    .replace(/\s/g, '')
+    .toUpperCase();
+  if (!sequence) throw new Error('FASTA配列が空です。');
+  if (sequence.length > MAX_GENOME_LENGTH) {
+    throw new Error(`リファレンスは${sequence.length.toLocaleString()} bpです。10kb以下にしてください。`);
+  }
+  if (!/^[ACGTRYSWKMBDHVN]+$/i.test(sequence)) {
+    throw new Error('FASTAに想定外の文字があります。IUPAC塩基コードのみ対応しています。');
+  }
+  return {
+    fileName: file.name,
+    name: header.replace(/^>/, '').trim().split(/\s+/)[0] || file.name,
+    sequence,
+  };
 }
 
 function parseMdTag(md: string, referenceStart: number) {
@@ -125,7 +210,7 @@ function parseOptionalTags(bytes: Uint8Array, view: DataView, offset: number, en
   return { md };
 }
 
-export async function parseBamFile(file: File): Promise<BamAnalysis> {
+export async function parseBamFile(file: File, referenceInput?: ReferenceSequence | null): Promise<BamAnalysis> {
   if (!file.name.toLowerCase().endsWith('.bam')) {
     throw new Error('BAMファイル（.bam）を選択してください。');
   }
@@ -134,7 +219,7 @@ export async function parseBamFile(file: File): Promise<BamAnalysis> {
   }
 
   const compressed = new Uint8Array(await file.arrayBuffer());
-  const bytes = gunzipSync(compressed);
+  const bytes = decompressBamBytes(compressed);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let offset = 0;
 
@@ -164,6 +249,11 @@ export async function parseBamFile(file: File): Promise<BamAnalysis> {
   const reference = references[0];
   if (reference.length > MAX_GENOME_LENGTH) {
     throw new Error(`最初のreferenceは${reference.length.toLocaleString()} bpです。10kb以下のBAMにしてください。`);
+  }
+  if (referenceInput && referenceInput.sequence.length !== reference.length) {
+    throw new Error(
+      `FASTAは${referenceInput.sequence.length.toLocaleString()} bp、BAMの最初のreferenceは${reference.length.toLocaleString()} bpです。長さが一致するFASTAを指定してください。`,
+    );
   }
 
   const coverage = new Array(reference.length).fill(0);
@@ -222,6 +312,15 @@ export async function parseBamFile(file: File): Promise<BamAnalysis> {
           if (op === 'X') {
             for (let i = 0; i < length; i += 1) mismatchPositions.push(refCursor + i);
           }
+          if (referenceInput) {
+            for (let i = 0; i < length; i += 1) {
+              const readBase = sequence[readCursor + i];
+              const referenceBase = referenceInput.sequence[refCursor + i];
+              if (readBase && referenceBase && readBase !== 'N' && referenceBase !== 'N' && readBase !== referenceBase) {
+                mismatchPositions.push(refCursor + i);
+              }
+            }
+          }
           refCursor += length;
           readCursor += length;
         } else if (op === 'I') {
@@ -239,7 +338,7 @@ export async function parseBamFile(file: File): Promise<BamAnalysis> {
         const mdEvents = parseMdTag(optional.md, pos);
         mismatchPositions.push(...mdEvents.mismatches);
         indelPositions.push(...mdEvents.deletions);
-      } else {
+      } else if (!referenceInput) {
         sequence.split('').forEach((base, index) => {
           if (base === 'N' && randomish(readName, index) < 0.12) mismatchPositions.push(pos + index);
         });
@@ -278,6 +377,7 @@ export async function parseBamFile(file: File): Promise<BamAnalysis> {
     fileName: file.name,
     referenceName: reference.name,
     genomeLength: reference.length,
+    referenceSequence: referenceInput?.sequence,
     reads,
     coverage,
     maxCoverage,

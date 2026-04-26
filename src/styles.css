@@ -285,6 +285,16 @@ input[type="range"] {
   background: #ddfaea;
 }
 
+.file-picker.secondary span {
+  color: #23313a;
+  border-color: #cfd8dd;
+  background: #ffffff;
+}
+
+.file-picker.secondary:hover span {
+  background: #f4f7f8;
+}
+
 .insight-block p {
   margin-top: 12px;
   color: #5f6d75;
