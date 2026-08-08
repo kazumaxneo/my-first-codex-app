@@ -127,6 +127,9 @@ input {
 .identity-line { stroke: #2674d9; }
 .return-line { stroke: #e07043; }
 .rate-line { stroke: #16834d; stroke-dasharray: 8 6; }
+.legend-line.identity-line { border-top-color: #2674d9; }
+.legend-line.return-line { border-top-color: #e07043; }
+.legend-line.rate-line { border-top-color: #16834d; }
 
 .ani-legend {
   display: flex;

@@ -529,11 +529,6 @@ function AniSimulationPanel() {
   return (
     <section className="ani-panel" aria-labelledby="ani-title">
       <div className="ani-heading">
-        <div>
-          <p className="eyebrow">TAB 1 · EVOLUTIONARY DISTANCE</p>
-          <h2 id="ani-title">ANIで見える一致率と、見えない多重置換</h2>
-          <p>観測一致率と累積置換量を比較するシンプルなモデルです。</p>
-        </div>
         <div className="ani-controls">
           <Slider label="Substitution rate" value={substitutionRate} min={0.1} max={1.2} step={0.1} unit=" /site/時間" onChange={setSubstitutionRate} />
           <Slider label="Sites" value={siteCount} min={100} max={10000} step={100} onChange={setSiteCount} />
