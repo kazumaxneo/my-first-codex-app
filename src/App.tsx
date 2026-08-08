@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import {
   Activity,
   Dna,
@@ -497,10 +499,97 @@ function Slider({
   );
 }
 
+function Latex({ formula, display = false }: { formula: string; display?: boolean }) {
+  return <span dangerouslySetInnerHTML={{ __html: katex.renderToString(formula, { displayMode: display, throwOnError: false }) }} />;
+}
+
+function AniSimulationPanel() {
+  const [substitutionRate, setSubstitutionRate] = useState(0.8);
+  const [siteCount, setSiteCount] = useState(3000);
+  const width = 900;
+  const height = 430;
+  const margin = { top: 28, right: 70, bottom: 68, left: 76 };
+  const points = useMemo(
+    () =>
+      Array.from({ length: 81 }, (_, index) => {
+        const accumulated = (index / 80) * 3.6;
+        const identity = 0.25 + 0.75 * Math.exp((-4 * accumulated) / 3);
+        const noChange = Math.exp(-accumulated);
+        return { accumulated, identity, returned: Math.max(0, identity - noChange) };
+      }),
+    [],
+  );
+  const x = (value: number) => margin.left + (value / 3.6) * (width - margin.left - margin.right);
+  const yRate = (value: number) => height - margin.bottom - (value / 1.2) * (height - margin.top - margin.bottom);
+  const yPercent = (value: number) => height - margin.bottom - value * (height - margin.top - margin.bottom);
+  const path = (key: 'identity' | 'returned') =>
+    points.map((point, index) => `${index === 0 ? 'M' : 'L'}${x(point.accumulated).toFixed(1)},${yPercent(point[key]).toFixed(1)}`).join(' ');
+  const ratePath = `M${x(0)},${yRate(substitutionRate).toFixed(1)} L${x(3.6)},${yRate(substitutionRate).toFixed(1)}`;
+
+  return (
+    <section className="ani-panel" aria-labelledby="ani-title">
+      <div className="ani-heading">
+        <div>
+          <p className="eyebrow">TAB 1 · EVOLUTIONARY DISTANCE</p>
+          <h2 id="ani-title">ANIで見える一致率と、見えない多重置換</h2>
+          <p>観測一致率と累積置換量を比較するシンプルなモデルです。</p>
+        </div>
+        <div className="ani-controls">
+          <Slider label="Substitution rate" value={substitutionRate} min={0.1} max={1.2} step={0.1} unit=" /site/時間" onChange={setSubstitutionRate} />
+          <Slider label="Sites" value={siteCount} min={100} max={10000} step={100} onChange={setSiteCount} />
+        </div>
+      </div>
+
+      <div className="ani-chart-wrap">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="累積置換量に対する観測一致率と復帰率">
+          <rect data-chart-frame x={margin.left} y={margin.top} width={width - margin.left - margin.right} height={height - margin.top - margin.bottom} fill="none" />
+          {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
+            <g key={tick}>
+              <line x1={margin.left} x2={width - margin.right} y1={yPercent(tick)} y2={yPercent(tick)} className="ani-grid" />
+              <text x={margin.left - 12} y={yPercent(tick) + 4} textAnchor="end">{Math.round(tick * 100)}%</text>
+              <text x={width - margin.right + 12} y={yPercent(tick) + 4}>{Math.round(tick * 100)}%</text>
+            </g>
+          ))}
+          {[0, 0.9, 1.8, 2.7, 3.6].map((tick) => (
+            <g key={tick}>
+              <line x1={x(tick)} x2={x(tick)} y1={height - margin.bottom} y2={height - margin.bottom + 6} className="ani-axis" />
+              <text x={x(tick)} y={height - margin.bottom + 24} textAnchor="middle">{tick.toFixed(1)}</text>
+            </g>
+          ))}
+          <line x1={margin.left} x2={margin.left} y1={margin.top} y2={height - margin.bottom} className="ani-axis" />
+          <line x1={width - margin.right} x2={width - margin.right} y1={margin.top} y2={height - margin.bottom} className="ani-axis" />
+          <line x1={margin.left} x2={width - margin.right} y1={height - margin.bottom} y2={height - margin.bottom} className="ani-axis" />
+          <path d={path('identity')} className="ani-line identity-line" />
+          <path d={path('returned')} className="ani-line return-line" />
+          <path d={ratePath} className="ani-line rate-line" />
+          <text x={(margin.left + width - margin.right) / 2} y={height - 14} textAnchor="middle" className="axis-title">Accumulated substitutions per site</text>
+          <text x={22} y={(margin.top + height - margin.bottom) / 2} transform={`rotate(-90 22 ${(margin.top + height - margin.bottom) / 2})`} textAnchor="middle" className="axis-title">Substitution rate</text>
+          <text x={width - 10} y={margin.top - 9} textAnchor="end" className="axis-title">Observed identity / return rate</text>
+        </svg>
+      </div>
+      <div className="ani-legend">
+        <span><i className="legend-line identity-line" />Observed identity (ANI-like)</span>
+        <span><i className="legend-line return-line" />Hidden returns to the original base</span>
+        <span><i className="legend-line rate-line" />Substitution rate: {substitutionRate.toFixed(1)} /site/時間</span>
+      </div>
+
+      <div className="equation-block">
+        <h3>Model equations</h3>
+        <p>平均累積置換量</p>
+        <div className="formula"><Latex display formula="d = \mu t" /></div>
+        <p>観測上、初期塩基と同じに見える確率（JC69）</p>
+        <div className="formula"><Latex display formula="P_{\mathrm{same}}(d) = \frac{1}{4} + \frac{3}{4}e^{-\frac{4}{3}d}" /></div>
+        <p className="equation-note"><Latex formula={`N=${siteCount.toLocaleString()}`} /> sites · JC69 model</p>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [bamAnalysis, setBamAnalysis] = useState<BamAnalysis | null>(null);
   const [reference, setReference] = useState<ReferenceSequence | null>(null);
+  const [activeTab, setActiveTab] = useState<'ani' | 'coverage'>('ani');
   const [uploadMessage, setUploadMessage] = useState('BAM: not loaded');
   const [referenceMessage, setReferenceMessage] = useState('Reference: not loaded');
 
@@ -554,6 +643,11 @@ export default function App() {
 
   return (
     <main className="app-shell">
+      <nav className="site-tabs" aria-label="Teaching modules">
+        <button type="button" className={activeTab === 'ani' ? 'active' : ''} onClick={() => setActiveTab('ani')}>Tab 1 · ANI and substitutions</button>
+        <button type="button" className={activeTab === 'coverage' ? 'active' : ''} onClick={() => setActiveTab('coverage')}>Tab 2 · Short-read mapping</button>
+      </nav>
+      {activeTab === 'ani' ? <AniSimulationPanel /> : <>
       <section className="workspace">
         <header className="topbar">
           <div className="brand">
@@ -706,6 +800,7 @@ export default function App() {
           <span>Simulated 1.2 kb locus · synthetic reads · teaching mode</span>
         </div>
       </aside>
+      </>}
     </main>
   );
 }
