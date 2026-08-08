@@ -32,6 +32,133 @@ input {
   padding: 20px;
 }
 
+.site-tabs {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #d9e0e4;
+}
+
+.site-tabs button {
+  padding: 11px 15px;
+  color: #65727a;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.site-tabs button:hover,
+.site-tabs button.active {
+  color: #15321f;
+  border-bottom-color: #4fcb83;
+}
+
+.ani-panel {
+  grid-column: 1 / -1;
+  padding: 28px clamp(18px, 4vw, 56px) 38px;
+  border: 1px solid #d9e0e4;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(37, 45, 52, 0.08);
+}
+
+.ani-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 28px;
+  align-items: end;
+}
+
+.eyebrow {
+  color: #16834d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.ani-heading h2 {
+  margin-top: 8px;
+  color: #11191f;
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1.15;
+}
+
+.ani-heading p:not(.eyebrow) {
+  max-width: 690px;
+  margin-top: 10px;
+  color: #5f6d75;
+  line-height: 1.65;
+}
+
+.ani-controls {
+  display: grid;
+  min-width: 260px;
+  gap: 10px;
+}
+
+.ani-chart-wrap {
+  margin-top: 24px;
+  overflow-x: auto;
+}
+
+.ani-chart-wrap svg {
+  display: block;
+  width: 100%;
+  min-width: 620px;
+  height: auto;
+}
+
+.ani-chart-wrap text {
+  fill: #536169;
+  font-size: 12px;
+}
+
+.ani-chart-wrap .axis-title {
+  fill: #25343b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ani-chart-wrap [data-chart-frame] { stroke: #d8e0e4; }
+.ani-grid { stroke: #e7ecef; stroke-dasharray: 3 4; }
+.ani-axis { stroke: #aebbc2; }
+.ani-line { fill: none; stroke-width: 4; vector-effect: non-scaling-stroke; }
+.identity-line { stroke: #2674d9; }
+.return-line { stroke: #e07043; }
+.rate-line { stroke: #16834d; stroke-dasharray: 8 6; }
+
+.ani-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  margin: 2px 0 0 76px;
+  color: #536169;
+  font-size: 13px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 24px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-top: 3px solid;
+}
+
+.legend-line.rate-line { border-top-style: dashed; }
+
+.equation-block {
+  max-width: 840px;
+  margin: 30px auto 0;
+  padding-top: 22px;
+  border-top: 1px solid #e1e7eb;
+}
+
+.equation-block h3 { color: #243139; font-size: 16px; }
+.equation-block p { margin-top: 12px; color: #5f6d75; font-size: 14px; line-height: 1.55; }
+.equation-block .equation-note { margin-top: 4px; font-size: 12px; text-align: center; }
+.formula { margin: 15px 0; overflow-x: auto; color: #11191f; font-size: 1.25rem; text-align: center; }
+
 .workspace,
 .side-panel {
   border: 1px solid #d9e0e4;
@@ -400,6 +527,15 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 
+  .ani-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ani-controls {
+    max-width: 440px;
+  }
+
   .side-panel {
     order: -1;
   }
@@ -408,6 +544,23 @@ input[type="range"] {
 @media (max-width: 720px) {
   .app-shell {
     padding: 10px;
+  }
+
+  .site-tabs {
+    overflow-x: auto;
+  }
+
+  .site-tabs button {
+    flex: 0 0 auto;
+    font-size: 12px;
+  }
+
+  .ani-panel {
+    padding: 22px 14px 28px;
+  }
+
+  .ani-legend {
+    margin-left: 0;
   }
 
   .topbar {
