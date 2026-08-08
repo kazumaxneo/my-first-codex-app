@@ -506,6 +506,8 @@ function Latex({ formula, display = false }: { formula: string; display?: boolea
 function AniSimulationPanel() {
   const [substitutionRate, setSubstitutionRate] = useState(0.8);
   const [siteCount, setSiteCount] = useState(3000);
+  const [transitionBias, setTransitionBias] = useState(1);
+  const [timeSpan, setTimeSpan] = useState(12);
   const width = 900;
   const height = 430;
   const margin = { top: 28, right: 70, bottom: 68, left: 76 };
@@ -514,15 +516,28 @@ function AniSimulationPanel() {
     const states = new Uint8Array(siteCount);
     const changed = new Uint8Array(siteCount);
     const points: Array<{ time: number; identity: number; returned: number }> = [];
-    const step = 12 / 80;
+    const step = timeSpan / 80;
     for (let index = 0; index <= 80; index += 1) {
       if (index > 0) {
         const eventProbability = 1 - Math.exp(-substitutionRate * step);
         for (let site = 0; site < siteCount; site += 1) {
           if (random() < eventProbability) {
             const oldState = states[site];
-            let nextState = Math.floor(random() * 3);
-            if (nextState >= oldState) nextState += 1;
+            const alternatives = [0, 1, 2, 3].filter((state) => state !== oldState);
+            const weights = alternatives.map((state) => {
+              const isTransition = (oldState === 0 && state === 2) || (oldState === 2 && state === 0) || (oldState === 1 && state === 3) || (oldState === 3 && state === 1);
+              return isTransition ? transitionBias : 1;
+            });
+            const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+            let draw = random() * totalWeight;
+            let nextState = alternatives[alternatives.length - 1];
+            for (let option = 0; option < alternatives.length; option += 1) {
+              draw -= weights[option];
+              if (draw <= 0) {
+                nextState = alternatives[option];
+                break;
+              }
+            }
             states[site] = nextState;
             changed[site] = 1;
           }
@@ -537,13 +552,13 @@ function AniSimulationPanel() {
       points.push({ time: index * step, identity: same / siteCount, returned: returned / siteCount });
     }
     return points;
-  }, [siteCount, substitutionRate]);
-  const x = (value: number) => margin.left + (value / 12) * (width - margin.left - margin.right);
+  }, [siteCount, substitutionRate, timeSpan, transitionBias]);
+  const x = (value: number) => margin.left + (value / timeSpan) * (width - margin.left - margin.right);
   const yRate = (value: number) => height - margin.bottom - (value / 1.2) * (height - margin.top - margin.bottom);
   const yPercent = (value: number) => height - margin.bottom - value * (height - margin.top - margin.bottom);
   const path = (key: 'identity' | 'returned') =>
     points.map((point, index) => `${index === 0 ? 'M' : 'L'}${x(point.time).toFixed(1)},${yPercent(point[key]).toFixed(1)}`).join(' ');
-  const ratePath = `M${x(0)},${yRate(substitutionRate).toFixed(1)} L${x(12)},${yRate(substitutionRate).toFixed(1)}`;
+  const ratePath = `M${x(0)},${yRate(substitutionRate).toFixed(1)} L${x(timeSpan)},${yRate(substitutionRate).toFixed(1)}`;
 
   return (
     <section className="ani-panel" aria-labelledby="ani-title">
@@ -551,6 +566,8 @@ function AniSimulationPanel() {
         <div className="ani-controls">
           <Slider label="Substitution rate" value={substitutionRate} min={0.1} max={1.2} step={0.1} unit=" /site/時間" onChange={setSubstitutionRate} />
           <Slider label="Sites" value={siteCount} min={100} max={10000} step={100} onChange={setSiteCount} />
+          <Slider label="Transition bias" value={transitionBias} min={1} max={8} step={0.5} unit="×" onChange={setTransitionBias} />
+          <Slider label="Time span" value={timeSpan} min={4} max={24} step={1} unit=" 時間" onChange={setTimeSpan} />
         </div>
       </div>
 
@@ -564,10 +581,10 @@ function AniSimulationPanel() {
               <text x={width - margin.right + 12} y={yPercent(tick) + 4}>{Math.round(tick * 100)}%</text>
             </g>
           ))}
-          {[0, 3, 6, 9, 12].map((tick) => (
+          {Array.from({ length: 5 }, (_, index) => (timeSpan / 4) * index).map((tick) => (
             <g key={tick}>
               <line x1={x(tick)} x2={x(tick)} y1={height - margin.bottom} y2={height - margin.bottom + 6} className="ani-axis" />
-              <text x={x(tick)} y={height - margin.bottom + 24} textAnchor="middle">{tick}</text>
+              <text x={x(tick)} y={height - margin.bottom + 24} textAnchor="middle">{tick.toFixed(0)}</text>
             </g>
           ))}
           <line x1={margin.left} x2={margin.left} y1={margin.top} y2={height - margin.bottom} className="ani-axis" />
@@ -587,7 +604,7 @@ function AniSimulationPanel() {
         <span><i className="legend-line rate-line" />置換速度：{substitutionRate.toFixed(1)} /site/時間</span>
       </div>
       <p className="figure-caption">
-        図1．時間経過に伴う観測一致率と多重置換のシミュレーション。4種類の塩基が同じ確率で置換されるJC69モデルを用い、横軸に経過時間を示した。青は観測一致率、橙は一度以上置換された後に初期塩基へ戻った割合、緑の破線は設定した置換速度を表す。置換速度とサイト数を変更すると、曲線の変化とシミュレーションの揺らぎが変わる。
+        図1．時間経過に伴う観測一致率と多重置換のシミュレーション。4種類の塩基を用いた確率モデルにおいて、横軸に経過時間を示した。青は観測一致率、橙は一度以上置換された後に初期塩基へ戻った割合、緑の破線は設定した置換速度を表す。置換速度、サイト数、転移バイアス、シミュレーション時間を変更すると、曲線の変化と揺らぎを比較できる。
       </p>
 
       <div className="equation-block">
@@ -596,7 +613,7 @@ function AniSimulationPanel() {
         <div className="formula"><Latex display formula="d = \mu t" /></div>
         <p>観測上、初期塩基と同じに見える確率（JC69）</p>
         <div className="formula"><Latex display formula="P_{\mathrm{same}}(d) = \frac{1}{4} + \frac{3}{4}e^{-\frac{4}{3}d}" /></div>
-        <p className="equation-note"><Latex formula={`N=${siteCount.toLocaleString()}`} /> sites · JC69 model</p>
+        <p className="equation-note"><Latex formula={`N=${siteCount.toLocaleString()}`} /> sites · transition bias = {transitionBias.toFixed(1)}×</p>
       </div>
     </section>
   );
