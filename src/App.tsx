@@ -509,22 +509,41 @@ function AniSimulationPanel() {
   const width = 900;
   const height = 430;
   const margin = { top: 28, right: 70, bottom: 68, left: 76 };
-  const points = useMemo(
-    () =>
-      Array.from({ length: 81 }, (_, index) => {
-        const accumulated = (index / 80) * 3.6;
-        const identity = 0.25 + 0.75 * Math.exp((-4 * accumulated) / 3);
-        const noChange = Math.exp(-accumulated);
-        return { accumulated, identity, returned: Math.max(0, identity - noChange) };
-      }),
-    [],
-  );
-  const x = (value: number) => margin.left + (value / 3.6) * (width - margin.left - margin.right);
+  const points = useMemo(() => {
+    const random = mulberry32(20260809);
+    const states = new Uint8Array(siteCount);
+    const changed = new Uint8Array(siteCount);
+    const points: Array<{ time: number; identity: number; returned: number }> = [];
+    const step = 12 / 80;
+    for (let index = 0; index <= 80; index += 1) {
+      if (index > 0) {
+        const eventProbability = 1 - Math.exp(-substitutionRate * step);
+        for (let site = 0; site < siteCount; site += 1) {
+          if (random() < eventProbability) {
+            const oldState = states[site];
+            let nextState = Math.floor(random() * 3);
+            if (nextState >= oldState) nextState += 1;
+            states[site] = nextState;
+            changed[site] = 1;
+          }
+        }
+      }
+      let same = 0;
+      let returned = 0;
+      for (let site = 0; site < siteCount; site += 1) {
+        if (states[site] === 0) same += 1;
+        if (changed[site] && states[site] === 0) returned += 1;
+      }
+      points.push({ time: index * step, identity: same / siteCount, returned: returned / siteCount });
+    }
+    return points;
+  }, [siteCount, substitutionRate]);
+  const x = (value: number) => margin.left + (value / 12) * (width - margin.left - margin.right);
   const yRate = (value: number) => height - margin.bottom - (value / 1.2) * (height - margin.top - margin.bottom);
   const yPercent = (value: number) => height - margin.bottom - value * (height - margin.top - margin.bottom);
   const path = (key: 'identity' | 'returned') =>
-    points.map((point, index) => `${index === 0 ? 'M' : 'L'}${x(point.accumulated).toFixed(1)},${yPercent(point[key]).toFixed(1)}`).join(' ');
-  const ratePath = `M${x(0)},${yRate(substitutionRate).toFixed(1)} L${x(3.6)},${yRate(substitutionRate).toFixed(1)}`;
+    points.map((point, index) => `${index === 0 ? 'M' : 'L'}${x(point.time).toFixed(1)},${yPercent(point[key]).toFixed(1)}`).join(' ');
+  const ratePath = `M${x(0)},${yRate(substitutionRate).toFixed(1)} L${x(12)},${yRate(substitutionRate).toFixed(1)}`;
 
   return (
     <section className="ani-panel" aria-labelledby="ani-title">
@@ -536,7 +555,7 @@ function AniSimulationPanel() {
       </div>
 
       <div className="ani-chart-wrap">
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="累積置換量に対する観測一致率と復帰率">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="時間に対する観測一致率と復帰率">
           <rect data-chart-frame x={margin.left} y={margin.top} width={width - margin.left - margin.right} height={height - margin.top - margin.bottom} fill="none" />
           {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
             <g key={tick}>
@@ -545,10 +564,10 @@ function AniSimulationPanel() {
               <text x={width - margin.right + 12} y={yPercent(tick) + 4}>{Math.round(tick * 100)}%</text>
             </g>
           ))}
-          {[0, 0.9, 1.8, 2.7, 3.6].map((tick) => (
+          {[0, 3, 6, 9, 12].map((tick) => (
             <g key={tick}>
               <line x1={x(tick)} x2={x(tick)} y1={height - margin.bottom} y2={height - margin.bottom + 6} className="ani-axis" />
-              <text x={x(tick)} y={height - margin.bottom + 24} textAnchor="middle">{tick.toFixed(1)}</text>
+              <text x={x(tick)} y={height - margin.bottom + 24} textAnchor="middle">{tick}</text>
             </g>
           ))}
           <line x1={margin.left} x2={margin.left} y1={margin.top} y2={height - margin.bottom} className="ani-axis" />
@@ -557,16 +576,19 @@ function AniSimulationPanel() {
           <path d={path('identity')} className="ani-line identity-line" />
           <path d={path('returned')} className="ani-line return-line" />
           <path d={ratePath} className="ani-line rate-line" />
-          <text x={(margin.left + width - margin.right) / 2} y={height - 14} textAnchor="middle" className="axis-title">Accumulated substitutions per site</text>
+          <text x={(margin.left + width - margin.right) / 2} y={height - 14} textAnchor="middle" className="axis-title">Time</text>
           <text x={22} y={(margin.top + height - margin.bottom) / 2} transform={`rotate(-90 22 ${(margin.top + height - margin.bottom) / 2})`} textAnchor="middle" className="axis-title">Substitution rate</text>
           <text x={width - 10} y={margin.top - 9} textAnchor="end" className="axis-title">Observed identity / return rate</text>
         </svg>
       </div>
       <div className="ani-legend">
-        <span><i className="legend-line identity-line" />Observed identity (ANI-like)</span>
-        <span><i className="legend-line return-line" />Hidden returns to the original base</span>
-        <span><i className="legend-line rate-line" />Substitution rate: {substitutionRate.toFixed(1)} /site/時間</span>
+        <span><i className="legend-line identity-line" />観測一致率（ANIに相当）</span>
+        <span><i className="legend-line return-line" />元の塩基へ戻った割合</span>
+        <span><i className="legend-line rate-line" />置換速度：{substitutionRate.toFixed(1)} /site/時間</span>
       </div>
+      <p className="figure-caption">
+        図1．時間経過に伴う観測一致率と多重置換のシミュレーション。4種類の塩基が同じ確率で置換されるJC69モデルを用い、横軸に経過時間を示した。青は観測一致率、橙は一度以上置換された後に初期塩基へ戻った割合、緑の破線は設定した置換速度を表す。置換速度とサイト数を変更すると、曲線の変化とシミュレーションの揺らぎが変わる。
+      </p>
 
       <div className="equation-block">
         <h3>Model equations</h3>
