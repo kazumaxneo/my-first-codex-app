@@ -553,7 +553,7 @@ function AniSimulationPanel() {
         <div className="ani-controls">
           <Slider label="Substitution rate" value={substitutionRate} min={0.1} max={1.2} step={0.1} unit=" /site/時間" onChange={setSubstitutionRate} />
           <Slider label="Sites" value={siteCount} min={100} max={10000} step={100} onChange={setSiteCount} />
-          <Slider label="Time span" value={timeSpan} min={4} max={24} step={1} unit=" 時間" onChange={setTimeSpan} />
+          <Slider label="Time span" value={timeSpan} min={0.1} max={50} step={0.1} unit=" 時間" onChange={setTimeSpan} />
         </div>
       </div>
 
@@ -570,7 +570,7 @@ function AniSimulationPanel() {
           {Array.from({ length: 5 }, (_, index) => (timeSpan / 4) * index).map((tick) => (
             <g key={tick}>
               <line x1={x(tick)} x2={x(tick)} y1={height - margin.bottom} y2={height - margin.bottom + 6} className="ani-axis" />
-              <text x={x(tick)} y={height - margin.bottom + 24} textAnchor="middle">{tick.toFixed(0)}</text>
+              <text x={x(tick)} y={height - margin.bottom + 24} textAnchor="middle">{tick.toFixed(timeSpan < 1 ? 1 : 0)}</text>
             </g>
           ))}
           <line x1={margin.left} x2={margin.left} y1={margin.top} y2={height - margin.bottom} className="ani-axis" />
