@@ -589,8 +589,7 @@ function AniSimulationPanel() {
   return (
     <section className="ani-panel" aria-label="ANI and multiple-substitution simulation">
       <header className="figure-heading">
-        <h2>観測一致率と多重置換</h2>
-        <p>共通祖先から独立に進化する2配列のJC69シミュレーション</p>
+        <p>共通祖先から独立に進化する2配列の配列同一性と多重置換の割合のシミュレーション</p>
       </header>
       <div className="ani-heading">
         <div className="ani-controls">
