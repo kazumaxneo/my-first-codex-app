@@ -611,8 +611,8 @@ function AniSimulationPanel() {
       </div>
 
       <div className="ani-chart-wrap">
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="時間に対する観測塩基一致率、多重置換で一致して見える割合、累積置換量">
-          <text x={margin.left} y={topPanel.top - 15} className="panel-title">観測される割合（%）</text>
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="時間に対する2配列の塩基配列の一致率、多重置換による見かけの一致率、累積置換量">
+          <text x={margin.left} y={topPanel.top - 15} className="panel-title">2配列の塩基配列の一致率（%）</text>
           <rect data-chart-frame x={margin.left} y={topPanel.top} width={plotWidth} height={topPanel.bottom - topPanel.top} fill="none" />
           {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
             <g key={tick}>
@@ -646,18 +646,18 @@ function AniSimulationPanel() {
         </svg>
       </div>
       <div className="ani-legend">
-        <span><i className="legend-line identity-line" />観測塩基一致率（ANIの概念的近似）</span>
-        <span><i className="legend-line return-line" />多重置換で一致して見える割合</span>
-        <span><i className="legend-line rate-line" />2配列間の累積置換量</span>
+        <span><i className="legend-line identity-line" />観測される2配列の塩基の一致率</span>
+        <span><i className="legend-line return-line" />多重置換による見かけの一致率</span>
+        <span><i className="legend-line rate-line" />累積置換量（substitutions/site）</span>
       </div>
       <div className="chart-readout" aria-live="polite">
         <span>時間<strong>{formatTime(selected.time)} 年</strong></span>
-        <span>観測一致率<strong>{(selected.identity * 100).toFixed(2)}%</strong></span>
-        <span>多重置換による一致<strong>{(selected.returned * 100).toFixed(2)}%</strong></span>
+        <span>2配列の塩基一致率<strong>{(selected.identity * 100).toFixed(2)}%</strong></span>
+        <span>見かけの一致率<strong>{(selected.returned * 100).toFixed(2)}%</strong></span>
         <span>累積置換量<strong>{formatAccumulated(selected.accumulated)}</strong></span>
       </div>
       <p className="figure-caption">
-        図1．共通祖先から独立に進化する2配列について、塩基置換の蓄積と観測塩基一致率の関係をJC69モデルで示した。上段の青は観測塩基一致率、橙の破線は置換を経験した後も同じ塩基として観測される割合、下段の緑は2配列間の平均累積置換量を表す。横軸は年単位の経過時間で、線形目盛と対数目盛を切り替えられる。初期値の置換速度は各系統10 substitutions/genome/yearとした教材用の仮定である。
+        図1．共通祖先から独立に進化する2配列について、塩基置換の蓄積と塩基配列の一致率の関係をJC69モデルで示した。上段の青は観測される2配列の塩基の一致率、橙の破線は多重置換による見かけの一致率、下段の緑は累積置換量（substitutions/site）を表す。横軸は年単位の経過時間で、LinearとLogを切り替えられる。初期値の置換速度は各系統10 substitutions/genome/yearとした教材用の仮定である。
       </p>
 
       <div className="equation-block">
