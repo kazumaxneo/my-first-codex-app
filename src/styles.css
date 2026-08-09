@@ -63,6 +63,22 @@ input {
   box-shadow: 0 18px 45px rgba(37, 45, 52, 0.08);
 }
 
+.figure-heading {
+  margin-bottom: 22px;
+}
+
+.figure-heading h2 {
+  color: #11191f;
+  font-size: clamp(22px, 3vw, 32px);
+  line-height: 1.2;
+}
+
+.figure-heading p {
+  margin-top: 7px;
+  color: #65727a;
+  font-size: 14px;
+}
+
 .ani-heading {
   display: flex;
   justify-content: space-between;
@@ -125,14 +141,15 @@ input {
 
 .ani-chart-wrap {
   margin-top: 24px;
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .ani-chart-wrap svg {
   display: block;
   width: 100%;
-  min-width: 620px;
+  min-width: 0;
   height: auto;
+  touch-action: none;
 }
 
 .ani-chart-wrap text {
@@ -146,12 +163,18 @@ input {
   font-weight: 700;
 }
 
+.ani-chart-wrap .panel-title {
+  fill: #25343b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .ani-chart-wrap [data-chart-frame] { stroke: #d8e0e4; }
 .ani-grid { stroke: #e7ecef; stroke-dasharray: 3 4; }
 .ani-axis { stroke: #aebbc2; }
 .ani-line { fill: none; stroke-width: 4; vector-effect: non-scaling-stroke; }
 .identity-line { stroke: #2674d9; }
-.return-line { stroke: #e07043; }
+.return-line { stroke: #e07043; stroke-dasharray: 5 4; }
 .rate-line { stroke: #16834d; stroke-dasharray: 8 6; }
 .legend-line.identity-line { border-top-color: #2674d9; }
 .legend-line.return-line { border-top-color: #e07043; }
@@ -175,6 +198,53 @@ input {
 }
 
 .legend-line.rate-line { border-top-style: dashed; }
+.legend-line.return-line { border-top-style: dashed; }
+
+.hover-guide {
+  stroke: #77858d;
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  pointer-events: none;
+}
+
+.identity-marker,
+.return-marker,
+.rate-marker {
+  fill: #ffffff;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.identity-marker { stroke: #2674d9; }
+.return-marker { stroke: #e07043; }
+.rate-marker { stroke: #16834d; }
+
+.chart-readout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  max-width: 840px;
+  margin: 14px auto 0;
+  overflow: hidden;
+  border: 1px solid #dce3e7;
+  border-radius: 8px;
+  background: #dce3e7;
+}
+
+.chart-readout span {
+  padding: 10px 12px;
+  color: #65727a;
+  background: #fbfcfd;
+  font-size: 11px;
+}
+
+.chart-readout strong {
+  display: block;
+  margin-top: 4px;
+  color: #172027;
+  font-size: 14px;
+}
 
 .figure-caption {
   max-width: 840px;
@@ -194,6 +264,7 @@ input {
 .equation-block h3 { color: #243139; font-size: 16px; }
 .equation-block p { margin-top: 12px; color: #5f6d75; font-size: 14px; line-height: 1.55; }
 .equation-block .equation-note { margin-top: 4px; font-size: 12px; text-align: center; }
+.equation-block .model-note { max-width: 720px; margin: 18px auto 0; font-size: 12px; text-align: center; }
 .formula { margin: 15px 0; overflow-x: auto; color: #11191f; font-size: 1.25rem; text-align: center; }
 
 .workspace,
@@ -598,6 +669,27 @@ input[type="range"] {
 
   .ani-legend {
     margin-left: 0;
+  }
+
+  .figure-heading {
+    margin-bottom: 18px;
+  }
+
+  .ani-chart-wrap {
+    margin-inline: -8px;
+  }
+
+  .ani-chart-wrap text {
+    font-size: 11px;
+  }
+
+  .ani-chart-wrap .panel-title,
+  .ani-chart-wrap .axis-title {
+    font-size: 11px;
+  }
+
+  .chart-readout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .topbar {
