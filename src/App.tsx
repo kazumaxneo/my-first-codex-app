@@ -610,7 +610,7 @@ function AniSimulationPanel() {
       </div>
 
       <div className="ani-chart-wrap">
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="時間に対する2配列の塩基配列の一致率、多重置換による見かけの一致率、累積置換量">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="時間に対する2配列の塩基配列の一致率、置換を経ても一致している割合、1サイトあたりの累積置換数">
           <text x={margin.left} y={topPanel.top - 15} className="panel-title">2配列の塩基配列の一致率（%）</text>
           <rect data-chart-frame x={margin.left} y={topPanel.top} width={plotWidth} height={topPanel.bottom - topPanel.top} fill="none" />
           {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
@@ -619,7 +619,7 @@ function AniSimulationPanel() {
               <text x={margin.left - 10} y={yPercent(tick) + 4} textAnchor="end">{Math.round(tick * 100)}</text>
             </g>
           ))}
-          <text x={margin.left} y={bottomPanel.top - 15} className="panel-title">2配列間の累積置換量（substitutions/site）</text>
+          <text x={margin.left} y={bottomPanel.top - 15} className="panel-title">1サイトあたりの累積置換数（2配列合計、substitutions/site）</text>
           <rect data-chart-frame x={margin.left} y={bottomPanel.top} width={plotWidth} height={bottomPanel.bottom - bottomPanel.top} fill="none" />
           {[0, 0.5, 1].map((tick) => (
             <g key={`acc-${tick}`}>
@@ -646,22 +646,22 @@ function AniSimulationPanel() {
       </div>
       <div className="ani-legend">
         <span><i className="legend-line identity-line" />観測される2配列の塩基の一致率</span>
-        <span><i className="legend-line return-line" />多重置換による見かけの一致率</span>
-        <span><i className="legend-line rate-line" />累積置換量（substitutions/site）</span>
+        <span><i className="legend-line return-line" />置換を経ても一致している割合</span>
+        <span><i className="legend-line rate-line" />1サイトあたりの累積置換数（2配列合計）</span>
       </div>
       <div className="chart-readout" aria-live="polite">
         <span>時間<strong>{formatTime(selected.time)} 年</strong></span>
         <span>2配列の塩基一致率<strong>{(selected.identity * 100).toFixed(2)}%</strong></span>
-        <span>見かけの一致率<strong>{(selected.returned * 100).toFixed(2)}%</strong></span>
-        <span>累積置換量<strong>{formatAccumulated(selected.accumulated)}</strong></span>
+        <span>置換後も一致する割合<strong>{(selected.returned * 100).toFixed(2)}%</strong></span>
+        <span>1サイトあたりの置換数<strong>{formatAccumulated(selected.accumulated)} substitutions/site</strong></span>
       </div>
       <p className="figure-caption">
-        図1．共通祖先から独立に進化する2配列について、塩基置換の蓄積と塩基配列の一致率の関係をJC69モデルで示した。上段の青は観測される2配列の塩基の一致率、橙の破線は多重置換による見かけの一致率、下段の緑は累積置換量（substitutions/site）を表す。横軸は年単位の経過時間で、LinearとLogを切り替えられる。初期値の置換速度は各系統10 substitutions/genome/yearとした教材用の仮定である。
+        図1．共通祖先から独立に進化する2配列について、塩基置換の蓄積と塩基配列の一致率の関係をJC69モデルで示した。上段の青は観測される2配列の塩基の一致率、橙の破線は置換を経ても2配列で同じ塩基として観測されるサイトの割合、下段の緑は両方の配列で起きた置換を合計した1サイトあたりの累積置換数を表す。横軸は年単位の経過時間で、LinearとLogを切り替えられる。初期値の置換速度は各系統10 substitutions/genome/yearとした教材用の仮定である。
       </p>
 
       <div className="equation-block">
         <h3>Model equations</h3>
-        <p>共通祖先から分岐した2配列間の平均累積置換量</p>
+        <p>共通祖先から分岐した2配列で起きた、1サイトあたりの累積置換数</p>
         <div className="formula"><Latex display formula="d = 2\frac{R}{L}t" /></div>
         <p>2配列で同じ塩基が観測される確率（JC69）</p>
         <div className="formula"><Latex display formula="P_{\mathrm{same}}(d) = \frac{1}{4} + \frac{3}{4}e^{-\frac{4}{3}d}" /></div>
