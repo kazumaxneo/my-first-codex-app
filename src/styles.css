@@ -97,6 +97,32 @@ input {
   gap: 10px;
 }
 
+.scale-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border: 1px solid #cfd8dd;
+  border-radius: 8px;
+}
+
+.scale-toggle button {
+  padding: 7px 10px;
+  color: #536169;
+  border: 0;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.scale-toggle button + button {
+  border-left: 1px solid #cfd8dd;
+}
+
+.scale-toggle button.active {
+  color: #15321f;
+  background: #ddfaea;
+  font-weight: 700;
+}
+
 .ani-chart-wrap {
   margin-top: 24px;
   overflow-x: auto;
@@ -149,6 +175,14 @@ input {
 }
 
 .legend-line.rate-line { border-top-style: dashed; }
+
+.figure-caption {
+  max-width: 840px;
+  margin: 14px auto 0;
+  color: #536169;
+  font-size: 13px;
+  line-height: 1.7;
+}
 
 .equation-block {
   max-width: 840px;
