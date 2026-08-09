@@ -513,7 +513,7 @@ function AniSimulationPanel() {
   const [substitutionRate, setSubstitutionRate] = useState(10);
   const [siteCount, setSiteCount] = useState(1000000);
   const [timeExponent, setTimeExponent] = useState(6);
-  const [timeScale, setTimeScale] = useState<'linear' | 'log'>('log');
+  const [timeScale, setTimeScale] = useState<'linear' | 'log'>('linear');
   const [compact, setCompact] = useState(() => window.innerWidth < 640);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
@@ -526,10 +526,10 @@ function AniSimulationPanel() {
   const timeSpan = Math.pow(10, timeExponent);
   const perSiteRate = substitutionRate / siteCount;
   const width = compact ? 420 : 900;
-  const height = compact ? 500 : 590;
+  const height = compact ? 460 : 430;
   const margin = { left: compact ? 52 : 76, right: compact ? 12 : 24 };
-  const topPanel = { top: compact ? 42 : 48, bottom: compact ? 252 : 322 };
-  const bottomPanel = { top: compact ? 312 : 394, bottom: compact ? 410 : 500 };
+  const topPanel = { top: 42, bottom: compact ? 220 : 218 };
+  const bottomPanel = { top: compact ? 275 : 272, bottom: compact ? 360 : 342 };
   const points = useMemo(() => {
     const random = mulberry32(20260809);
     const points: Array<{ time: number; identity: number; returned: number; accumulated: number }> = [];
@@ -601,10 +601,10 @@ function AniSimulationPanel() {
             <input type="range" min={-1} max={7} step={0.1} value={timeExponent} onChange={(event) => setTimeExponent(Number(event.target.value))} />
           </label>
           <div className="control">
-            <span>Time axis<strong>{timeScale === 'linear' ? '線形' : '対数'}</strong></span>
+            <span>Time axis<strong>{timeScale === 'linear' ? 'Linear' : 'Log'}</strong></span>
             <div className="scale-toggle" role="group" aria-label="時間軸の表示方法">
-              <button type="button" className={timeScale === 'linear' ? 'active' : ''} aria-pressed={timeScale === 'linear'} onClick={() => setTimeScale('linear')}>線形</button>
-              <button type="button" className={timeScale === 'log' ? 'active' : ''} aria-pressed={timeScale === 'log'} onClick={() => setTimeScale('log')}>対数</button>
+              <button type="button" className={timeScale === 'linear' ? 'active' : ''} aria-pressed={timeScale === 'linear'} onClick={() => setTimeScale('linear')}>Linear</button>
+              <button type="button" className={timeScale === 'log' ? 'active' : ''} aria-pressed={timeScale === 'log'} onClick={() => setTimeScale('log')}>Log</button>
             </div>
           </div>
         </div>

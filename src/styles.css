@@ -140,7 +140,9 @@ input {
 }
 
 .ani-chart-wrap {
+  max-width: 960px;
   margin-top: 24px;
+  margin-inline: auto;
   overflow: hidden;
 }
 
