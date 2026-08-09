@@ -512,7 +512,7 @@ function Latex({ formula, display = false }: { formula: string; display?: boolea
 function AniSimulationPanel() {
   const [substitutionRate, setSubstitutionRate] = useState(10);
   const [siteCount, setSiteCount] = useState(1000000);
-  const [timeExponent, setTimeExponent] = useState(6);
+  const [timeExponent, setTimeExponent] = useState(4.3);
   const [timeScale, setTimeScale] = useState<'linear' | 'log'>('linear');
   const [compact, setCompact] = useState(() => window.innerWidth < 640);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
