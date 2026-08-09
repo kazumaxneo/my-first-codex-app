@@ -660,7 +660,6 @@ function AniSimulationPanel() {
       </p>
 
       <div className="equation-block">
-        <h3>Model equations</h3>
         <p>共通祖先から分岐した2配列で起きた、1サイトあたりの累積置換数</p>
         <div className="formula"><Latex display formula="d = 2\frac{R}{L}t" /></div>
         <p>2配列で同じ塩基が観測される確率（JC69）</p>
