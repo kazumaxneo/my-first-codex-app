@@ -85,6 +85,12 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function normalRandom(random: () => number) {
+  const u = Math.max(random(), Number.EPSILON);
+  const v = Math.max(random(), Number.EPSILON);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
 function makeGcProfile(length: number) {
   return Array.from({ length }, (_, i) => {
     const wave = Math.sin(i / 62) * 0.17 + Math.sin(i / 23 + 1.4) * 0.07;
@@ -512,30 +518,22 @@ function AniSimulationPanel() {
   const margin = { top: 28, right: 70, bottom: 68, left: 76 };
   const points = useMemo(() => {
     const random = mulberry32(20260809);
-    const states = new Uint8Array(siteCount);
-    const changed = new Uint8Array(siteCount);
     const points: Array<{ time: number; identity: number; returned: number; accumulated: number }> = [];
     const step = timeSpan / 80;
     for (let index = 0; index <= 80; index += 1) {
-      if (index > 0) {
-        const eventProbability = 1 - Math.exp(-substitutionRate * step);
-        for (let site = 0; site < siteCount; site += 1) {
-          if (random() < eventProbability) {
-            const oldState = states[site];
-            let nextState = Math.floor(random() * 3);
-            if (nextState >= oldState) nextState += 1;
-            states[site] = nextState;
-            changed[site] = 1;
-          }
-        }
-      }
-      let same = 0;
-      let returned = 0;
-      for (let site = 0; site < siteCount; site += 1) {
-        if (states[site] === 0) same += 1;
-        if (changed[site] && states[site] === 0) returned += 1;
-      }
-      points.push({ time: index * step, identity: same / siteCount, returned: returned / siteCount, accumulated: substitutionRate * index * step });
+      const time = index * step;
+      const accumulated = substitutionRate * time;
+      const identityProbability = 0.25 + 0.75 * Math.exp((-4 * accumulated) / 3);
+      const unchangedProbability = Math.exp(-accumulated);
+      const returnProbability = Math.max(0, identityProbability - unchangedProbability);
+      const identityNoise = Math.sqrt((identityProbability * (1 - identityProbability)) / siteCount) * normalRandom(random);
+      const returnNoise = Math.sqrt((returnProbability * (1 - returnProbability)) / siteCount) * normalRandom(random);
+      points.push({
+        time,
+        identity: clamp(identityProbability + identityNoise, 0, 1),
+        returned: clamp(returnProbability + returnNoise, 0, 1),
+        accumulated,
+      });
     }
     return points;
   }, [siteCount, substitutionRate, timeSpan]);
@@ -552,7 +550,7 @@ function AniSimulationPanel() {
       <div className="ani-heading">
         <div className="ani-controls">
           <Slider label="Substitution rate" value={substitutionRate} min={0.1} max={1.2} step={0.1} unit=" /site/時間" onChange={setSubstitutionRate} />
-          <Slider label="Sites" value={siteCount} min={100} max={10000} step={100} onChange={setSiteCount} />
+          <Slider label="Sites" value={siteCount} min={100} max={10000000} step={1000} unit=" bp" onChange={setSiteCount} />
           <Slider label="Time span" value={timeSpan} min={0.1} max={50} step={0.1} unit=" 時間" onChange={setTimeSpan} />
         </div>
       </div>
