@@ -656,7 +656,7 @@ function AniSimulationPanel() {
         <span>1サイトあたりの置換数<strong>{formatAccumulated(selected.accumulated)} substitutions/site</strong></span>
       </div>
       <p className="figure-caption">
-        図1．共通祖先から独立に進化する2配列について、塩基置換の蓄積と塩基配列の一致率の関係をJC69モデルで示した。上段の青は観測される2配列の塩基の一致率、橙の破線は置換を経ても2配列で同じ塩基として観測されるサイトの割合、下段の緑は両方の配列で起きた置換を合計した1サイトあたりの累積置換数を表す。横軸は年単位の経過時間で、LinearとLogを切り替えられる。初期値の置換速度は各系統10 substitutions/genome/yearとした教材用の仮定である。
+        図1．共通祖先から独立に進化する2配列について、塩基置換の蓄積と塩基配列の一致率の関係をJC69モデルで示した。上段の青は観測される2配列の塩基の一致率、橙の破線は置換を経ても2配列で同じ塩基として観測されるサイトの割合、下段の緑は両方の配列で起きた置換を合計した1サイトあたりの累積置換数を表す。横軸は年単位の経過時間で、LinearとLogを切り替えられる。
       </p>
 
       <div className="equation-block">
