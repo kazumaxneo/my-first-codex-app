@@ -512,7 +512,7 @@ function Latex({ formula, display = false }: { formula: string; display?: boolea
 function AniSimulationPanel() {
   const [substitutionRate, setSubstitutionRate] = useState(10);
   const [siteCount, setSiteCount] = useState(1000000);
-  const [timeExponent, setTimeExponent] = useState(4.3);
+  const [timeSpan, setTimeSpan] = useState(20000);
   const [timeScale, setTimeScale] = useState<'linear' | 'log'>('linear');
   const [compact, setCompact] = useState(() => window.innerWidth < 640);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -523,7 +523,7 @@ function AniSimulationPanel() {
     return () => window.removeEventListener('resize', updateCompact);
   }, []);
 
-  const timeSpan = Math.pow(10, timeExponent);
+  const timeExponent = Math.log10(timeSpan);
   const perSiteRate = substitutionRate / siteCount;
   const width = compact ? 420 : 900;
   const height = compact ? 460 : 430;
@@ -569,7 +569,7 @@ function AniSimulationPanel() {
   });
   const formatTime = (value: number) => value >= 1000000 ? `${Number((value / 1000000).toPrecision(2))}M` : value >= 1000 ? `${Number((value / 1000).toPrecision(2))}k` : value < 1 && value > 0 ? value.toFixed(1) : value.toFixed(0);
   const formatAccumulated = (value: number) => value > 0 && value < 0.01 ? value.toExponential(2) : value.toFixed(3);
-  const selectedIndex = hoverIndex ?? Math.floor(points.length * 0.65);
+  const selectedIndex = hoverIndex ?? points.length - 1;
   const selected = points[selectedIndex];
   const handlePointerMove = (event: React.PointerEvent<SVGRectElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -597,7 +597,7 @@ function AniSimulationPanel() {
           <Slider label="Sites" value={siteCount} min={1000} max={10000000} step={1000} unit=" bp" onChange={setSiteCount} />
           <label className="control">
             <span>Time span<strong>{formatTime(timeSpan)} years</strong></span>
-            <input type="range" min={-1} max={7} step={0.1} value={timeExponent} onChange={(event) => setTimeExponent(Number(event.target.value))} />
+            <input type="range" min={-1} max={7} step={0.1} value={timeExponent} onChange={(event) => setTimeSpan(Math.pow(10, Number(event.target.value)))} />
           </label>
           <div className="control">
             <span>Time axis<strong>{timeScale === 'linear' ? 'Linear' : 'Log'}</strong></span>
