@@ -564,7 +564,7 @@ function AniSimulationPanel() {
             <g key={tick}>
               <line x1={margin.left} x2={width - margin.right} y1={yPercent(tick)} y2={yPercent(tick)} className="ani-grid" />
               <text x={margin.left - 12} y={yPercent(tick) + 4} textAnchor="end">{Math.round(tick * 100)}%</text>
-              <text x={width - margin.right + 12} y={yPercent(tick) + 4}>{Math.round(tick * 100)}%</text>
+              <text x={width - margin.right + 12} y={yAccumulated(maxAccumulated * tick) + 4}>{(maxAccumulated * tick).toFixed(1)}</text>
             </g>
           ))}
           {Array.from({ length: 5 }, (_, index) => (timeSpan / 4) * index).map((tick) => (
@@ -580,8 +580,8 @@ function AniSimulationPanel() {
           <path d={path('returned')} className="ani-line return-line" />
           <path d={accumulatedPath} className="ani-line rate-line" />
           <text x={(margin.left + width - margin.right) / 2} y={height - 14} textAnchor="middle" className="axis-title">Time</text>
-          <text x={22} y={(margin.top + height - margin.bottom) / 2} transform={`rotate(-90 22 ${(margin.top + height - margin.bottom) / 2})`} textAnchor="middle" className="axis-title">Accumulated substitutions per site</text>
-          <text x={width - 10} y={margin.top - 9} textAnchor="end" className="axis-title">Observed identity / return rate</text>
+          <text x={22} y={(margin.top + height - margin.bottom) / 2} transform={`rotate(-90 22 ${(margin.top + height - margin.bottom) / 2})`} textAnchor="middle" className="axis-title">Sequence identity between two sequences</text>
+          <text x={width - 10} y={margin.top - 9} textAnchor="end" className="axis-title">Accumulated substitutions per site</text>
         </svg>
       </div>
       <div className="ani-legend">
@@ -590,7 +590,7 @@ function AniSimulationPanel() {
         <span><i className="legend-line rate-line" />累積置換量（d = μt、速度 {substitutionRate.toFixed(1)} /site/時間）</span>
       </div>
       <p className="figure-caption">
-        図1．時間経過に伴う観測一致率と多重置換のシミュレーション。4種類の塩基を用いた確率モデルにおいて、横軸に経過時間を示した。青は観測一致率、橙は一度以上置換された後に初期塩基へ戻った割合、緑の破線は平均累積置換量（d = μt）を表す。置換速度、サイト数、シミュレーション時間を変更すると、曲線の変化と揺らぎを比較できる。
+        図1．時間経過に伴う配列一致率と多重置換のシミュレーション。4種類の塩基を用いた確率モデルにおいて、横軸に経過時間、左縦軸に2配列間のsequence identity、右縦軸に平均累積置換量（substitutions/site）を示した。青は観測一致率、橙は一度以上置換された後に初期塩基へ戻った割合、緑の破線は平均累積置換量（d = μt）を表す。置換速度、サイト数、シミュレーション時間を変更すると、曲線の変化と揺らぎを比較できる。
       </p>
 
       <div className="equation-block">
