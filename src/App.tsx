@@ -510,19 +510,20 @@ function Latex({ formula, display = false }: { formula: string; display?: boolea
 }
 
 function AniSimulationPanel() {
-  const [substitutionRate, setSubstitutionRate] = useState(0.8);
-  const [siteCount, setSiteCount] = useState(3000);
-  const [timeSpan, setTimeSpan] = useState(12);
+  const [substitutionRate, setSubstitutionRate] = useState(10);
+  const [siteCount, setSiteCount] = useState(1000000);
+  const [timeExponent, setTimeExponent] = useState(6);
+  const timeSpan = Math.pow(10, timeExponent);
+  const perSiteRate = substitutionRate / siteCount;
   const width = 900;
   const height = 430;
   const margin = { top: 28, right: 70, bottom: 68, left: 76 };
   const points = useMemo(() => {
     const random = mulberry32(20260809);
     const points: Array<{ time: number; identity: number; returned: number; accumulated: number }> = [];
-    const step = timeSpan / 80;
     for (let index = 0; index <= 80; index += 1) {
-      const time = index * step;
-      const accumulated = substitutionRate * time;
+      const time = index === 0 ? 0 : Math.pow(10, -1 + ((index - 1) / 79) * (timeExponent + 1));
+      const accumulated = perSiteRate * time;
       const identityProbability = 0.25 + 0.75 * Math.exp((-4 * accumulated) / 3);
       const unchangedProbability = Math.exp(-accumulated);
       const returnProbability = Math.max(0, identityProbability - unchangedProbability);
@@ -536,22 +537,28 @@ function AniSimulationPanel() {
       });
     }
     return points;
-  }, [siteCount, substitutionRate, timeSpan]);
-  const x = (value: number) => margin.left + (value / timeSpan) * (width - margin.left - margin.right);
-  const maxAccumulated = Math.max(1, substitutionRate * timeSpan);
+  }, [perSiteRate, siteCount, timeExponent]);
+  const x = (value: number) => margin.left + (Math.log10(1 + value) / Math.log10(1 + timeSpan)) * (width - margin.left - margin.right);
+  const maxAccumulated = Math.max(1e-9, perSiteRate * timeSpan);
   const yAccumulated = (value: number) => height - margin.bottom - (value / maxAccumulated) * (height - margin.top - margin.bottom);
   const yPercent = (value: number) => height - margin.bottom - value * (height - margin.top - margin.bottom);
   const path = (key: 'identity' | 'returned') =>
     points.map((point, index) => `${index === 0 ? 'M' : 'L'}${x(point.time).toFixed(1)},${yPercent(point[key]).toFixed(1)}`).join(' ');
-  const accumulatedPath = `M${x(0)},${yAccumulated(0).toFixed(1)} L${x(timeSpan)},${yAccumulated(substitutionRate * timeSpan).toFixed(1)}`;
+  const accumulatedPath = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${x(point.time).toFixed(1)},${yAccumulated(point.accumulated).toFixed(1)}`).join(' ');
+  const timeTicks = [0, ...Array.from({ length: Math.floor(timeExponent) + 2 }, (_, index) => Math.pow(10, index - 1))].filter((tick) => tick <= timeSpan);
+  const formatTime = (value: number) => value >= 1000000 ? `${Number((value / 1000000).toPrecision(2))}M` : value >= 1000 ? `${Number((value / 1000).toPrecision(2))}k` : value < 1 && value > 0 ? value.toFixed(1) : value.toFixed(0);
+  const formatAccumulated = (value: number) => value > 0 && value < 0.01 ? value.toExponential(1) : value.toFixed(2);
 
   return (
-    <section className="ani-panel" aria-labelledby="ani-title">
+    <section className="ani-panel" aria-label="ANI and multiple-substitution simulation">
       <div className="ani-heading">
         <div className="ani-controls">
-          <Slider label="Substitution rate" value={substitutionRate} min={0.1} max={1.2} step={0.1} unit=" /site/時間" onChange={setSubstitutionRate} />
+          <Slider label="Substitution rate" value={substitutionRate} min={0.1} max={100} step={0.1} unit=" /genome/year" onChange={setSubstitutionRate} />
           <Slider label="Sites" value={siteCount} min={100} max={10000000} step={1000} unit=" bp" onChange={setSiteCount} />
-          <Slider label="Time span" value={timeSpan} min={0.1} max={50} step={0.1} unit=" 時間" onChange={setTimeSpan} />
+          <label className="control">
+            <span>Time span<strong>{formatTime(timeSpan)} years</strong></span>
+            <input type="range" min={-1} max={7} step={0.1} value={timeExponent} onChange={(event) => setTimeExponent(Number(event.target.value))} />
+          </label>
         </div>
       </div>
 
@@ -562,13 +569,13 @@ function AniSimulationPanel() {
             <g key={tick}>
               <line x1={margin.left} x2={width - margin.right} y1={yPercent(tick)} y2={yPercent(tick)} className="ani-grid" />
               <text x={margin.left - 12} y={yPercent(tick) + 4} textAnchor="end">{Math.round(tick * 100)}%</text>
-              <text x={width - margin.right + 12} y={yAccumulated(maxAccumulated * tick) + 4}>{(maxAccumulated * tick).toFixed(1)}</text>
+              <text x={width - margin.right + 12} y={yAccumulated(maxAccumulated * tick) + 4}>{formatAccumulated(maxAccumulated * tick)}</text>
             </g>
           ))}
-          {Array.from({ length: 5 }, (_, index) => (timeSpan / 4) * index).map((tick) => (
+          {timeTicks.map((tick) => (
             <g key={tick}>
               <line x1={x(tick)} x2={x(tick)} y1={height - margin.bottom} y2={height - margin.bottom + 6} className="ani-axis" />
-              <text x={x(tick)} y={height - margin.bottom + 24} textAnchor="middle">{tick.toFixed(timeSpan < 1 ? 1 : 0)}</text>
+              <text x={x(tick)} y={height - margin.bottom + 24} textAnchor="middle">{formatTime(tick)}</text>
             </g>
           ))}
           <line x1={margin.left} x2={margin.left} y1={margin.top} y2={height - margin.bottom} className="ani-axis" />
@@ -577,7 +584,7 @@ function AniSimulationPanel() {
           <path d={path('identity')} className="ani-line identity-line" />
           <path d={path('returned')} className="ani-line return-line" />
           <path d={accumulatedPath} className="ani-line rate-line" />
-          <text x={(margin.left + width - margin.right) / 2} y={height - 14} textAnchor="middle" className="axis-title">Time</text>
+          <text x={(margin.left + width - margin.right) / 2} y={height - 14} textAnchor="middle" className="axis-title">Time (years, log scale)</text>
           <text x={22} y={(margin.top + height - margin.bottom) / 2} transform={`rotate(-90 22 ${(margin.top + height - margin.bottom) / 2})`} textAnchor="middle" className="axis-title">Sequence identity between two sequences</text>
           <text x={width - 10} y={margin.top - 9} textAnchor="end" className="axis-title">Accumulated substitutions per site</text>
         </svg>
@@ -585,16 +592,16 @@ function AniSimulationPanel() {
       <div className="ani-legend">
         <span><i className="legend-line identity-line" />観測一致率（ANIに相当）</span>
         <span><i className="legend-line return-line" />元の塩基へ戻った割合</span>
-        <span><i className="legend-line rate-line" />累積置換量（d = μt、速度 {substitutionRate.toFixed(1)} /site/時間）</span>
+        <span><i className="legend-line rate-line" />累積置換量（d = Rt/L、速度 {substitutionRate.toFixed(1)} /genome/year）</span>
       </div>
       <p className="figure-caption">
-        図1．時間経過に伴う配列一致率と多重置換のシミュレーション。4種類の塩基を用いた確率モデルにおいて、横軸に経過時間、左縦軸に2配列間のsequence identity、右縦軸に平均累積置換量（substitutions/site）を示した。青は観測一致率、橙は一度以上置換された後に初期塩基へ戻った割合、緑の破線は平均累積置換量（d = μt）を表す。置換速度、サイト数、シミュレーション時間を変更すると、曲線の変化と揺らぎを比較できる。
+        図1．時間経過に伴う配列一致率と多重置換のシミュレーション。横軸に年単位の経過時間（対数目盛）、左縦軸に2配列間のsequence identity、右縦軸に平均累積置換量（substitutions/site）を示した。青は観測一致率、橙は一度以上置換された後に初期塩基へ戻った割合、緑の破線は平均累積置換量を表す。初期値の置換速度10 substitutions/genome/yearは教材用の仮定であり、生物種、培養条件、世代時間によって異なる。
       </p>
 
       <div className="equation-block">
         <h3>Model equations</h3>
         <p>平均累積置換量</p>
-        <div className="formula"><Latex display formula="d = \mu t" /></div>
+        <div className="formula"><Latex display formula="d = \frac{R}{L}t" /></div>
         <p>観測上、初期塩基と同じに見える確率（JC69）</p>
         <div className="formula"><Latex display formula="P_{\mathrm{same}}(d) = \frac{1}{4} + \frac{3}{4}e^{-\frac{4}{3}d}" /></div>
         <p className="equation-note"><Latex formula={`N=${siteCount.toLocaleString()}`} /> sites</p>
